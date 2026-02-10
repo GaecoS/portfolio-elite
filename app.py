@@ -48,23 +48,23 @@ df = carica_dati(st.session_state.portfolio)
 oggi_eu = df['oggi_e'].sum() if not df.empty else 0
 color_session = "#10b981" if oggi_eu >= 0 else "#ef4444"
 
-# --- 4. CSS CHIRURGICO (FIX CELLE ALTO) ---
+# --- 4. CSS CHIRURGICO ---
 st.markdown(f"""
     <style>
+    /* Reset Geometria */
     * {{ box-sizing: border-box !important; }}
     [data-testid="stAppViewContainer"] {{ max-width: 100vw; overflow-x: hidden; }}
     
-    /* FIX CRITICO: Aumento spazio sopra per non tagliare le celle sotto l'header */
+    /* FIX TOP: Spazio extra in alto per non tagliare le celle */
     .block-container {{ 
-        padding-top: 4rem !important; 
+        padding-top: 3.5rem !important; 
         padding-left: 0.5rem !important; 
         padding-right: 0.5rem !important; 
     }}
     
-    /* CELLE TOP: Bordo inferiore colorato, no margine negativo */
+    /* FIX CELLE TOP: Flex row forzato */
     .flex-row {{ 
-        display: flex; flex-wrap: nowrap; gap: 8px; 
-        width: 100%; 
+        display: flex; flex-wrap: nowrap; gap: 8px; width: 100%; 
         align-items: stretch; margin-bottom: 12px; 
     }}
     .flex-item {{ flex: 1; min-width: 0; padding: 12px 5px !important; }}
@@ -73,20 +73,21 @@ st.markdown(f"""
     .grid-asset {{ display: grid; grid-template-columns: 1.8fr 1fr 1fr 1fr 1fr 1.2fr; gap: 8px; align-items: center; width: 100%; }}
     .compact-row {{ background: #1e293b; border-radius: 8px; padding: 4px 12px !important; margin-bottom: 3px !important; border: 1px solid #334155; }}
     
-    /* MAPPA: Codice confermato "ok" */
+    /* FIX MAPPA: Bordo SINISTRO RIPRISTINATO + Larghezza Calcolata */
     [data-testid="stPlotlyChart"] > div {{
-        border-left: 10px solid {color_session} !important;
+        border-left: 10px solid {color_session} !important; /* Bordo FISICO */
         border-radius: 12px !important;
         background-color: #1e293b !important;
         padding-left: 5px !important;
-        width: calc(100% - 15px) !important; 
+        width: calc(100% - 15px) !important; /* Compensa il bordo per evitare tagli */
         margin-right: 15px !important;
         border: 1px solid #334155 !important;
     }}
-    
+
     .main-price {{ font-size: clamp(1.4rem, 6vw, 2.2rem) !important; font-weight: 900 !important; color: white; margin: 0; }}
     .asset-name {{ font-size: 1.1rem !important; font-weight: 900 !important; color: white; }}
     
+    /* STRATEGY CONTAINER HTML */
     .strategy-container {{ display: flex; gap: 10px; align-items: stretch; height: 160px; margin-bottom: 20px; }}
     .strategy-box {{ background: #1e293b; border-radius: 12px; padding: 12px; display: flex; align-items: center; flex: 1; border: 1px solid #334155; }}
     </style>
@@ -142,44 +143,39 @@ if not df.empty:
         marker=dict(colors=df['tile_color'], cornerradius=12),
         root_color="#1e293b",
         texttemplate="<span style='font-size:22px; font-weight:900;'>%{label}</span><br><span style='font-size:16px;'>%{customdata:+.2f}%</span>",
-        customdata=df['oggi_p'],
-        textposition="middle center",
-        hoverinfo='none'
+        customdata=df['oggi_p'], textposition="middle center", hoverinfo='none'
     )
-    # R=15 per sicurezza su AMD/FCT (come richiesto)
-    fig.update_layout(height=260, margin=dict(t=0, l=0, r=15, b=0), paper_bgcolor='rgba(0,0,0,0)')
+    # Margine destro r=10 per evitare che il testo tocchi il bordo fisico
+    fig.update_layout(height=260, margin=dict(t=0, l=0, r=10, b=0), paper_bgcolor='rgba(0,0,0,0)')
     st.plotly_chart(fig, width='stretch', config={'displayModeBar': False})
 
-    # STRATEGY
+    # STRATEGY (HTML PURO: PIE | BEST/WORST)
     st.subheader("Strategy")
     top_t, flop_t = df.loc[df['oggi_p'].idxmax()], df.loc[df['oggi_p'].idxmin()]
     sec_d = df.groupby('settore')['Peso %'].sum().sort_values(ascending=False)
     colors_p = ['#10b981','#3b82f6','#f59e0b','#ef4444','#8b5cf6']
     conic = ", ".join([f"{colors_p[i%5]} {sum(sec_d.values[:i]):.1f}% {sum(sec_d.values[:i+1]):.1f}%" for i in range(len(sec_d))])
     
-    col_st1, col_st2 = st.columns(2)
-    with col_st1:
-        st.markdown(f'''
-        <div class="strategy-box" style="border-left:8px solid #3b82f6; display:flex; align-items:center;">
-            <div style="width:90px; height:90px; border-radius:50%; flex-shrink:0; background:conic-gradient({conic});"></div>
-            <div style="font-size:0.75rem; padding-left:12px; color:#cbd5e1;">
-                {"".join([f'<div><span style="color:{colors_p[i%5]};">●</span> {s}: <b>{v:.0f}%</b></div>' for i, (s,v) in enumerate(sec_d.items())])}
+    st.markdown(f'''
+    <div class="strategy-container">
+        <div class="strategy-box" style="border-left:8px solid #3b82f6;">
+            <div style="width:100px; height:100px; border-radius:50%; border:2px solid #0f172a; flex-shrink:0; background:conic-gradient({conic});"></div>
+            <div style="font-size:0.75rem; padding-left:12px; color:#cbd5e1; line-height:1.4;">
+                {"".join([f'<div><span style="color:{colors_p[i%5]}; font-size:12px;">●</span> {s}: <b>{v:.0f}%</b></div>' for i, (s,v) in enumerate(sec_d.items())])}
             </div>
         </div>
-        ''', unsafe_allow_html=True)
-    with col_st2:
-        st.markdown(f'''
-        <div style="display:flex; flex-direction:column; gap:8px;">
-            <div class="strategy-box" style="border-left:8px solid #10b981; height:76px; display:flex; justify-content:space-between; align-items:center; padding:0 15px;">
-                <span><small style="color:#10b981; font-weight:bold;">BEST</small><br><b>{top_t["Titolo"]}</b></span>
-                <span style="font-size:1.4rem; font-weight:900; color:#10b981;">{top_t["oggi_p"]:+.2f}%</span>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
+            <div class="strategy-box" style="border-left:8px solid #10b981; justify-content: space-between; padding: 0 20px;">
+                <div><small style="color:#10b981; font-weight:bold;">BEST</small><br><b>{top_t["Titolo"]}</b></div>
+                <span style="font-size:1.8rem; font-weight:900; color:#10b981;">{top_t["oggi_p"]:+.2f}%</span>
             </div>
-            <div class="strategy-box" style="border-left:8px solid #ef4444; height:76px; display:flex; justify-content:space-between; align-items:center; padding:0 15px;">
-                <span><small style="color:#ef4444; font-weight:bold;">WORST</small><br><b>{flop_t["Titolo"]}</b></span>
-                <span style="font-size:1.4rem; font-weight:900; color:#ef4444;">{flop_t["oggi_p"]:+.2f}%</span>
+            <div class="strategy-box" style="border-left:8px solid #ef4444; justify-content: space-between; padding: 0 20px;">
+                <div><small style="color:#ef4444; font-weight:bold;">WORST</small><br><b>{flop_t["Titolo"]}</b></div>
+                <span style="font-size:1.8rem; font-weight:900; color:#ef4444;">{flop_t["oggi_p"]:+.2f}%</span>
             </div>
         </div>
-        ''', unsafe_allow_html=True)
+    </div>
+    ''', unsafe_allow_html=True)
 
     # TARGET PRIZE 2026
     st.subheader("Target Prize 2026")
