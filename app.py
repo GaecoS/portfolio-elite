@@ -48,46 +48,51 @@ df = carica_dati(st.session_state.portfolio)
 oggi_eu = df['oggi_e'].sum() if not df.empty else 0
 color_session = "#10b981" if oggi_eu >= 0 else "#ef4444"
 
-# --- 4. CSS CHIRURGICO ---
+# --- 4. CSS CHIRURGICO (FIX ALTEZZE) ---
 st.markdown(f"""
     <style>
-    /* Reset Geometria */
     * {{ box-sizing: border-box !important; }}
-    [data-testid="stAppViewContainer"] {{ max-width: 100vw; overflow-x: hidden; }}
+    [data-testid="stAppViewContainer"] {{ overflow-y: auto !important; overflow-x: hidden !important; }}
     
-    /* FIX TOP: Spazio extra in alto per non tagliare le celle */
+    /* 1. Spazio Top Calibrato */
     .block-container {{ 
-        padding-top: 3.5rem !important; 
-        padding-left: 0.5rem !important; 
-        padding-right: 0.5rem !important; 
+        padding-top: 5.5rem !important; 
+        padding-left: 0.8rem !important; 
+        padding-right: 0.8rem !important; 
     }}
     
-    /* FIX CELLE TOP: Flex row forzato */
-    .flex-row {{ 
-        display: flex; flex-wrap: nowrap; gap: 8px; width: 100%; 
-        align-items: stretch; margin-bottom: 12px; 
-    }}
+    /* 2. Celle Top */
+    .flex-row {{ display: flex; flex-wrap: nowrap; gap: 8px; width: 100%; margin-bottom: 15px; }}
     .flex-item {{ flex: 1; min-width: 0; padding: 12px 5px !important; }}
     
-    /* ASSET DETAILS */
+    /* 3. Asset Details */
     .grid-asset {{ display: grid; grid-template-columns: 1.8fr 1fr 1fr 1fr 1fr 1.2fr; gap: 8px; align-items: center; width: 100%; }}
-    .compact-row {{ background: #1e293b; border-radius: 8px; padding: 4px 12px !important; margin-bottom: 3px !important; border: 1px solid #334155; }}
+    .compact-row {{ background: #1e293b; border-radius: 8px; padding: 5px 12px !important; margin-bottom: 4px; border: 1px solid #334155; }}
     
-    /* FIX MAPPA: Bordo SINISTRO RIPRISTINATO + Larghezza Calcolata */
+    /* 4. MAPPA: SINCRONIZZAZIONE MILLIMETRICA */
     [data-testid="stPlotlyChart"] > div {{
-        border-left: 10px solid {color_session} !important; /* Bordo FISICO */
+        border-top: 10px solid {color_session} !important;
         border-radius: 12px !important;
         background-color: #1e293b !important;
-        padding-left: 5px !important;
-        width: calc(100% - 15px) !important; /* Compensa il bordo per evitare tagli */
-        margin-right: 15px !important;
-        border: 1px solid #334155 !important;
+        border-bottom: 1px solid #334155 !important;
+        border-right: 1px solid #334155 !important;
+        border-left: 1px solid #334155 !important;
+        
+        overflow: hidden !important;
+        
+        /* Altezza cella = Altezza grafico (270) + Bordo Top (10) + Slack (2) */
+        height: 282px !important; 
+        width: 100% !important;
+        
+        padding: 0 !important;
+        display: block !important;
+        margin-bottom: 0 !important;
     }}
+    
+    .stPlotlyChart, .js-plotly-plot {{ overflow: hidden !important; }}
 
     .main-price {{ font-size: clamp(1.4rem, 6vw, 2.2rem) !important; font-weight: 900 !important; color: white; margin: 0; }}
     .asset-name {{ font-size: 1.1rem !important; font-weight: 900 !important; color: white; }}
-    
-    /* STRATEGY CONTAINER HTML */
     .strategy-container {{ display: flex; gap: 10px; align-items: stretch; height: 160px; margin-bottom: 20px; }}
     .strategy-box {{ background: #1e293b; border-radius: 12px; padding: 12px; display: flex; align-items: center; flex: 1; border: 1px solid #334155; }}
     </style>
@@ -97,7 +102,7 @@ st.markdown(f"""
 if not df.empty:
     tot_cap, tot_pl = df['valore'].sum(), df['tot_e'].sum()
     
-    # METRICHE TOP
+    # A. METRICHE TOP
     st.markdown(f'''
     <div class="flex-row">
         <div class="flex-item" style="background:#1e293b; border-radius:12px; border-bottom:5px solid white; text-align:center;">
@@ -115,7 +120,7 @@ if not df.empty:
     </div>
     ''', unsafe_allow_html=True)
 
-    # ASSET DETAILS
+    # B. ASSET DETAILS
     st.subheader("Asset Details")
     for _, row in df.iterrows():
         c = "#10b981" if row['oggi_p'] >= 0 else "#ef4444"
@@ -130,7 +135,7 @@ if not df.empty:
         </div>
         ''', unsafe_allow_html=True)
 
-    # MARKET MAP
+    # C. MARKET MAP (SINCRONIZZATA)
     st.subheader("Market Map")
     def get_color(v):
         if v > 1.5: return '#10b981'
@@ -138,18 +143,19 @@ if not df.empty:
         if v > -0.5: return '#475569'
         return '#ef4444'
     df['tile_color'] = df['oggi_p'].apply(get_color)
+    
     fig = px.treemap(df, path=['Titolo'], values='valore')
     fig.update_traces(
         marker=dict(colors=df['tile_color'], cornerradius=12),
         root_color="#1e293b",
-        texttemplate="<span style='font-size:22px; font-weight:900;'>%{label}</span><br><span style='font-size:16px;'>%{customdata:+.2f}%</span>",
+        texttemplate="<span style='font-size:22px; font-weight:900;'>%{label}</span><br>%{customdata:+.2f}%",
         customdata=df['oggi_p'], textposition="middle center", hoverinfo='none'
     )
-    # Margine destro r=10 per evitare che il testo tocchi il bordo fisico
-    fig.update_layout(height=260, margin=dict(t=0, l=0, r=10, b=0), paper_bgcolor='rgba(0,0,0,0)')
-    st.plotly_chart(fig, width='stretch', config={'displayModeBar': False})
+    # Margine B=10: tiene le scritte in basso visibili senza creare vuoti enormi
+    fig.update_layout(height=270, margin=dict(t=2, l=5, r=15, b=10), paper_bgcolor='rgba(0,0,0,0)')
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-    # STRATEGY (HTML PURO: PIE | BEST/WORST)
+    # D. STRATEGY
     st.subheader("Strategy")
     top_t, flop_t = df.loc[df['oggi_p'].idxmax()], df.loc[df['oggi_p'].idxmin()]
     sec_d = df.groupby('settore')['Peso %'].sum().sort_values(ascending=False)
@@ -158,26 +164,26 @@ if not df.empty:
     
     st.markdown(f'''
     <div class="strategy-container">
-        <div class="strategy-box" style="border-left:8px solid #3b82f6;">
-            <div style="width:100px; height:100px; border-radius:50%; border:2px solid #0f172a; flex-shrink:0; background:conic-gradient({conic});"></div>
-            <div style="font-size:0.75rem; padding-left:12px; color:#cbd5e1; line-height:1.4;">
-                {"".join([f'<div><span style="color:{colors_p[i%5]}; font-size:12px;">●</span> {s}: <b>{v:.0f}%</b></div>' for i, (s,v) in enumerate(sec_d.items())])}
+        <div class="strategy-box" style="border-left:8px solid #3b82f6; width:50%;">
+            <div style="width:90px; height:90px; border-radius:50%; flex-shrink:0; background:conic-gradient({conic});"></div>
+            <div style="font-size:0.75rem; padding-left:12px; color:#cbd5e1;">
+                {"".join([f'<div><span style="color:{colors_p[i%5]};">●</span> {s}: <b>{v:.0f}%</b></div>' for i, (s,v) in enumerate(sec_d.items())])}
             </div>
         </div>
         <div style="flex: 1; display: flex; flex-direction: column; gap: 8px;">
-            <div class="strategy-box" style="border-left:8px solid #10b981; justify-content: space-between; padding: 0 20px;">
-                <div><small style="color:#10b981; font-weight:bold;">BEST</small><br><b>{top_t["Titolo"]}</b></div>
-                <span style="font-size:1.8rem; font-weight:900; color:#10b981;">{top_t["oggi_p"]:+.2f}%</span>
+            <div class="strategy-box" style="border-left:8px solid #10b981; height:100%; justify-content:space-between; padding:0 15px;">
+                <span><small style="color:#10b981; font-weight:bold;">BEST</small><br><b>{top_t["Titolo"]}</b></span>
+                <span style="font-size:1.4rem; font-weight:900; color:#10b981;">{top_t["oggi_p"]:+.2f}%</span>
             </div>
-            <div class="strategy-box" style="border-left:8px solid #ef4444; justify-content: space-between; padding: 0 20px;">
-                <div><small style="color:#ef4444; font-weight:bold;">WORST</small><br><b>{flop_t["Titolo"]}</b></div>
-                <span style="font-size:1.8rem; font-weight:900; color:#ef4444;">{flop_t["oggi_p"]:+.2f}%</span>
+            <div class="strategy-box" style="border-left:8px solid #ef4444; height:100%; justify-content:space-between; padding:0 15px;">
+                <span><small style="color:#ef4444; font-weight:bold;">WORST</small><br><b>{flop_t["Titolo"]}</b></span>
+                <span style="font-size:1.4rem; font-weight:900; color:#ef4444;">{flop_t["oggi_p"]:+.2f}%</span>
             </div>
         </div>
     </div>
     ''', unsafe_allow_html=True)
 
-    # TARGET PRIZE 2026
+    # E. TARGET PRIZE 2026
     st.subheader("Target Prize 2026")
     for _, row in df.iterrows():
         prog = min(max((row['prezzo']/row['target'])*100, 0), 100)
