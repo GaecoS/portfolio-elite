@@ -48,7 +48,7 @@ df = carica_dati(st.session_state.portfolio)
 oggi_eu = df['oggi_e'].sum() if not df.empty else 0
 color_session = "#10b981" if oggi_eu >= 0 else "#ef4444"
 
-# --- 4. CSS CHIRURGICO (FIX ALTEZZE) ---
+# --- 4. CSS CHIRURGICO (FIX DEFINITIVO ALTEZZE + SCROLL) ---
 st.markdown(f"""
     <style>
     * {{ box-sizing: border-box !important; }}
@@ -56,7 +56,7 @@ st.markdown(f"""
     
     /* 1. Spazio Top Calibrato */
     .block-container {{ 
-        padding-top: 5.5rem !important; 
+        padding-top: 5rem !important; 
         padding-left: 0.8rem !important; 
         padding-right: 0.8rem !important; 
     }}
@@ -69,7 +69,7 @@ st.markdown(f"""
     .grid-asset {{ display: grid; grid-template-columns: 1.8fr 1fr 1fr 1fr 1fr 1.2fr; gap: 8px; align-items: center; width: 100%; }}
     .compact-row {{ background: #1e293b; border-radius: 8px; padding: 5px 12px !important; margin-bottom: 4px; border: 1px solid #334155; }}
     
-    /* 4. MAPPA: SINCRONIZZAZIONE MILLIMETRICA */
+    /* 4. MAPPA: ALTEZZA FISSA MATEMATICA (260px) */
     [data-testid="stPlotlyChart"] > div {{
         border-top: 10px solid {color_session} !important;
         border-radius: 12px !important;
@@ -80,16 +80,16 @@ st.markdown(f"""
         
         overflow: hidden !important;
         
-        /* Altezza cella = Altezza grafico (270) + Bordo Top (10) + Slack (2) */
-        height: 282px !important; 
+        /* Altezza Totale = 250px (Chart) + 10px (Bordo Top) = 260px */
+        height: 260px !important; 
         width: 100% !important;
         
         padding: 0 !important;
-        display: block !important;
-        margin-bottom: 0 !important;
+        margin: 0 !important;
     }}
     
-    .stPlotlyChart, .js-plotly-plot {{ overflow: hidden !important; }}
+    /* Forza altezza anche sul contenitore interno di Streamlit */
+    .stPlotlyChart, .js-plotly-plot {{ overflow: hidden !important; height: 260px !important; }}
 
     .main-price {{ font-size: clamp(1.4rem, 6vw, 2.2rem) !important; font-weight: 900 !important; color: white; margin: 0; }}
     .asset-name {{ font-size: 1.1rem !important; font-weight: 900 !important; color: white; }}
@@ -135,7 +135,7 @@ if not df.empty:
         </div>
         ''', unsafe_allow_html=True)
 
-    # C. MARKET MAP (SINCRONIZZATA)
+    # C. MARKET MAP (AGGIORNATA width='stretch')
     st.subheader("Market Map")
     def get_color(v):
         if v > 1.5: return '#10b981'
@@ -151,9 +151,11 @@ if not df.empty:
         texttemplate="<span style='font-size:22px; font-weight:900;'>%{label}</span><br>%{customdata:+.2f}%",
         customdata=df['oggi_p'], textposition="middle center", hoverinfo='none'
     )
-    # Margine B=10: tiene le scritte in basso visibili senza creare vuoti enormi
-    fig.update_layout(height=270, margin=dict(t=2, l=5, r=15, b=10), paper_bgcolor='rgba(0,0,0,0)')
-    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+    # Altezza 250px esatti per incastrarsi nel box da 260px (con 10px di bordo)
+    fig.update_layout(height=250, margin=dict(t=0, l=5, r=5, b=0), paper_bgcolor='rgba(0,0,0,0)')
+    
+    # FIX ERRORE 2026: width="stretch" invece di use_container_width=True
+    st.plotly_chart(fig, width="stretch", config={'displayModeBar': False})
 
     # D. STRATEGY
     st.subheader("Strategy")
