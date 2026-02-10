@@ -7,7 +7,7 @@ import plotly.express as px
 # --- 1. CONFIGURAZIONE ---
 st.set_page_config(page_title="Portfolio Elite 2026", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. IL TUO PORTAFOGLIO ---
+# --- 2. DATI PORTAFOGLIO ---
 if 'portfolio' not in st.session_state:
     st.session_state.portfolio = [
         {"titolo": "STELLANTIS", "ticker": "STLAM.MI", "qty": 2060, "carico": 12.91, "settore": "Auto"}, 
@@ -48,28 +48,30 @@ df = carica_dati(st.session_state.portfolio)
 oggi_eu = df['oggi_e'].sum() if not df.empty else 0
 color_session = "#10b981" if oggi_eu >= 0 else "#ef4444"
 
-# --- 4. CSS CHIRURGICO (FIX DEFINITIVO ALTEZZE + SCROLL) ---
+# --- 4. CSS "KILL SCROLLBAR" ---
 st.markdown(f"""
     <style>
     * {{ box-sizing: border-box !important; }}
-    [data-testid="stAppViewContainer"] {{ overflow-y: auto !important; overflow-x: hidden !important; }}
     
-    /* 1. Spazio Top Calibrato */
-    .block-container {{ 
-        padding-top: 5rem !important; 
-        padding-left: 0.8rem !important; 
-        padding-right: 0.8rem !important; 
+    [data-testid="stAppViewContainer"] {{ 
+        overflow-y: auto !important; 
+        overflow-x: hidden !important; 
     }}
     
-    /* 2. Celle Top */
-    .flex-row {{ display: flex; flex-wrap: nowrap; gap: 8px; width: 100%; margin-bottom: 15px; }}
-    .flex-item {{ flex: 1; min-width: 0; padding: 12px 5px !important; }}
+    .block-container {{ 
+        padding-top: 5rem !important; 
+        padding-bottom: 5rem !important;
+        padding-left: 0.5rem !important; 
+        padding-right: 0.5rem !important; 
+    }}
     
-    /* 3. Asset Details */
-    .grid-asset {{ display: grid; grid-template-columns: 1.8fr 1fr 1fr 1fr 1fr 1.2fr; gap: 8px; align-items: center; width: 100%; }}
-    .compact-row {{ background: #1e293b; border-radius: 8px; padding: 5px 12px !important; margin-bottom: 4px; border: 1px solid #334155; }}
-    
-    /* 4. MAPPA: ALTEZZA FISSA MATEMATICA (260px) */
+    /* TARGET AGGRESSIVO SUL CONTENITORE DELLA MAPPA */
+    [data-testid="stPlotlyChart"] {{
+        overflow: hidden !important; /* Blocca scroll sul padre */
+        padding: 0 !important;
+        margin: 0 !important;
+    }}
+
     [data-testid="stPlotlyChart"] > div {{
         border-top: 10px solid {color_session} !important;
         border-radius: 12px !important;
@@ -78,21 +80,23 @@ st.markdown(f"""
         border-right: 1px solid #334155 !important;
         border-left: 1px solid #334155 !important;
         
-        overflow: hidden !important;
-        
-        /* Altezza Totale = 250px (Chart) + 10px (Bordo Top) = 260px */
-        height: 260px !important; 
+        /* QUESTA È LA CHIAVE: Altezza fissa > Altezza Grafico */
+        height: 300px !important; 
         width: 100% !important;
         
-        padding: 0 !important;
-        margin: 0 !important;
+        overflow: hidden !important; /* Blocca scroll sul figlio */
+        display: block !important;
     }}
     
-    /* Forza altezza anche sul contenitore interno di Streamlit */
-    .stPlotlyChart, .js-plotly-plot {{ overflow: hidden !important; height: 260px !important; }}
+    /* Blocca scroll interno a Plotly */
+    .js-plotly-plot .plot-container {{ overflow: hidden !important; }}
 
+    /* Stili generali */
+    .flex-row {{ display: flex; flex-wrap: nowrap; gap: 8px; width: 100%; margin-bottom: 15px; }}
+    .flex-item {{ flex: 1; min-width: 0; padding: 12px 5px !important; }}
     .main-price {{ font-size: clamp(1.4rem, 6vw, 2.2rem) !important; font-weight: 900 !important; color: white; margin: 0; }}
-    .asset-name {{ font-size: 1.1rem !important; font-weight: 900 !important; color: white; }}
+    .grid-asset {{ display: grid; grid-template-columns: 1.8fr 1fr 1fr 1fr 1fr 1.2fr; gap: 8px; align-items: center; width: 100%; }}
+    .compact-row {{ background: #1e293b; border-radius: 8px; padding: 5px 12px !important; margin-bottom: 4px; border: 1px solid #334155; }}
     .strategy-container {{ display: flex; gap: 10px; align-items: stretch; height: 160px; margin-bottom: 20px; }}
     .strategy-box {{ background: #1e293b; border-radius: 12px; padding: 12px; display: flex; align-items: center; flex: 1; border: 1px solid #334155; }}
     </style>
@@ -102,7 +106,7 @@ st.markdown(f"""
 if not df.empty:
     tot_cap, tot_pl = df['valore'].sum(), df['tot_e'].sum()
     
-    # A. METRICHE TOP
+    # METRICHE TOP
     st.markdown(f'''
     <div class="flex-row">
         <div class="flex-item" style="background:#1e293b; border-radius:12px; border-bottom:5px solid white; text-align:center;">
@@ -120,7 +124,7 @@ if not df.empty:
     </div>
     ''', unsafe_allow_html=True)
 
-    # B. ASSET DETAILS
+    # ASSET DETAILS
     st.subheader("Asset Details")
     for _, row in df.iterrows():
         c = "#10b981" if row['oggi_p'] >= 0 else "#ef4444"
@@ -135,7 +139,7 @@ if not df.empty:
         </div>
         ''', unsafe_allow_html=True)
 
-    # C. MARKET MAP (AGGIORNATA width='stretch')
+    # MARKET MAP
     st.subheader("Market Map")
     def get_color(v):
         if v > 1.5: return '#10b981'
@@ -151,13 +155,15 @@ if not df.empty:
         texttemplate="<span style='font-size:22px; font-weight:900;'>%{label}</span><br>%{customdata:+.2f}%",
         customdata=df['oggi_p'], textposition="middle center", hoverinfo='none'
     )
-    # Altezza 250px esatti per incastrarsi nel box da 260px (con 10px di bordo)
-    fig.update_layout(height=250, margin=dict(t=0, l=5, r=5, b=0), paper_bgcolor='rgba(0,0,0,0)')
     
-    # FIX ERRORE 2026: width="stretch" invece di use_container_width=True
+    # Altezza grafico 280px (Contenitore CSS è 300px -> 20px di margine sicuro)
+    # Margine bottom b=30 per non tagliare le scritte
+    fig.update_layout(height=280, margin=dict(t=5, l=0, r=10, b=30), paper_bgcolor='rgba(0,0,0,0)')
+    
+    # FIX ERRORE 2026: width="stretch"
     st.plotly_chart(fig, width="stretch", config={'displayModeBar': False})
 
-    # D. STRATEGY
+    # STRATEGY
     st.subheader("Strategy")
     top_t, flop_t = df.loc[df['oggi_p'].idxmax()], df.loc[df['oggi_p'].idxmin()]
     sec_d = df.groupby('settore')['Peso %'].sum().sort_values(ascending=False)
@@ -185,7 +191,7 @@ if not df.empty:
     </div>
     ''', unsafe_allow_html=True)
 
-    # E. TARGET PRIZE 2026
+    # TARGET PRIZE 2026
     st.subheader("Target Prize 2026")
     for _, row in df.iterrows():
         prog = min(max((row['prezzo']/row['target'])*100, 0), 100)
